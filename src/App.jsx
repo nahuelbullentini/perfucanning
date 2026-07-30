@@ -22,10 +22,10 @@ function parseExcel(file) {
           Object.keys(row).forEach((k) => { map[normalizeHeader(k)] = row[k]; });
           return {
             id: uid(),
-            sku: String(map["sku"] ?? "").trim(),
+            sku: String(map["sku"] ?? map["codigo"] ?? map["cod"] ?? "").trim(),
             stock: Number(map["stock"] ?? 0) || 0,
-            price: Number(map["precio"] ?? 0) || 0,
-            description: String(map["descripcion"] ?? "").trim(),
+            price: Number(map["precio"] ?? map["lista1"] ?? map["preciolista1"] ?? map["preciodeventa"] ?? 0) || 0,
+            description: String(map["descripcion"] ?? map["producto"] ?? "").trim(),
             image: null,
           };
         }).filter((p) => p.sku);
@@ -618,11 +618,11 @@ function Admin({ products, setProducts, email, setEmail, adminSecret, flash }) {
   }
 
   function confirmImport() {
-    const bySku = new Map(products.map((p) => [p.sku, p]));
-    preview.forEach((p) => bySku.set(p.sku, { ...bySku.get(p.sku), ...p, image: p.image || bySku.get(p.sku)?.image || null }));
-    setProducts(Array.from(bySku.values()));
+    const prevBySku = new Map(products.map((p) => [p.sku, p]));
+    const next = preview.map((p) => ({ ...p, image: p.image || prevBySku.get(p.sku)?.image || null }));
+    setProducts(next);
     setPreview(null);
-    flash("Catálogo actualizado.");
+    flash("Catálogo reemplazado con los productos del Excel.");
   }
 
   function updateProduct(id, field, value) {
@@ -667,7 +667,7 @@ function Admin({ products, setProducts, email, setEmail, adminSecret, flash }) {
 
       <Section icon={<Upload size={16} />} title="Cargar catálogo desde Excel">
         <p style={{ fontSize: 12.5, color: "#8a7f74", marginTop: -6, marginBottom: 12 }}>
-          Columnas esperadas: <strong>SKU</strong>, <strong>Stock</strong>, <strong>Precio</strong>, <strong>Descripcion</strong>.
+          Columnas reconocidas: <strong>Codigo</strong> (o SKU), <strong>Stock</strong>, <strong>Lista1</strong> (o Precio), <strong>Descripcion</strong>. El resto de las columnas de tu Excel (Rubro, Marca, Precio Compra, etc.) se ignoran. <strong>Al confirmar, reemplaza todo el catálogo actual</strong> — los productos que no estén en este Excel se borran de la tienda. Si un SKU ya existía, conserva su foto automáticamente.
         </p>
         <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleExcel} style={{ display: "none" }} />
         <button className="btn" onClick={() => fileRef.current.click()} style={{ background: "#20191c", color: "#fff", padding: "10px 18px", borderRadius: 8, fontSize: 13.5, display: "flex", alignItems: "center", gap: 8 }}>
@@ -677,6 +677,9 @@ function Admin({ products, setProducts, email, setEmail, adminSecret, flash }) {
 
       {preview && (
         <Section icon={<Check size={16} />} title={`Previsualización (${preview.length} filas)`}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", color: "#8A6D3B", fontSize: 12.5, marginTop: -4, marginBottom: 12 }}>
+            <AlertCircle size={14} /> Al confirmar, se van a borrar los {products.length} productos actuales y quedar solo estos {preview.length}.
+          </div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
@@ -698,7 +701,7 @@ function Admin({ products, setProducts, email, setEmail, adminSecret, flash }) {
             </table>
           </div>
           <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-            <button className="btn" onClick={confirmImport} style={{ background: "#20191c", color: "#fff", padding: "10px 18px", borderRadius: 8, fontSize: 13.5 }}>Confirmar importación</button>
+            <button className="btn" onClick={confirmImport} style={{ background: "#20191c", color: "#fff", padding: "10px 18px", borderRadius: 8, fontSize: 13.5 }}>Reemplazar catálogo</button>
             <button className="btn" onClick={() => setPreview(null)} style={{ background: "#F0E9DC", color: "#5c5148", padding: "10px 18px", borderRadius: 8, fontSize: 13.5 }}>Cancelar</button>
           </div>
         </Section>
