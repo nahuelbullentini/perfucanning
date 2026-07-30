@@ -3,7 +3,7 @@ import * as XLSX from "xlsx";
 import { Upload, Image as ImageIcon, Trash2, Plus, Minus, ShoppingBag, X, Mail, Package, Check, AlertCircle, Search, Lock, RotateCcw, CreditCard, ListOrdered } from "lucide-react";
 
 const uid = () => Math.random().toString(36).slice(2, 10);
-const emptyProduct = () => ({ id: uid(), sku: "", stock: 0, price: 0, description: "", image: null });
+const emptyProduct = () => ({ id: uid(), sku: "", stock: 0, price: 0, description: "", marca: "", rubro: "", image: null });
 
 function normalizeHeader(h) {
   return String(h || "").trim().toLowerCase().replace(/[áàä]/g, "a").replace(/[éèë]/g, "e").replace(/[íìï]/g, "i").replace(/[óòö]/g, "o").replace(/[úùü]/g, "u");
@@ -26,6 +26,8 @@ function parseExcel(file) {
             stock: Number(map["stock"] ?? 0) || 0,
             price: Number(map["precio"] ?? map["lista1"] ?? map["preciolista1"] ?? map["preciodeventa"] ?? 0) || 0,
             description: String(map["descripcion"] ?? map["producto"] ?? "").trim(),
+            marca: String(map["marca"] ?? "").trim(),
+            rubro: String(map["rubro"] ?? "").trim(),
             image: null,
           };
         }).filter((p) => p.sku);
@@ -85,17 +87,11 @@ export default function App() {
     setTimeout(() => setToast(null), 2600);
   }
 
-  async function persistProducts(next) {
-    setProducts(next);
+  async function refreshPublicProducts() {
     try {
-      await api("/api/admin/products", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", "x-admin-secret": adminSecret },
-        body: JSON.stringify(next),
-      });
-    } catch {
-      flash("No se pudo guardar el catálogo. Reintentá.");
-    }
+      const p = await api("/api/products");
+      setProducts(p);
+    } catch {}
   }
 
   async function persistEmail(next) {
@@ -110,29 +106,29 @@ export default function App() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#FBF8F3", color: "#20191c" }}>
+    <div style={{ minHeight: "100vh", background: "#0A0A0A", color: "#F2EFEA" }}>
       <style>{`
         * { box-sizing: border-box; }
         .btn { border: none; cursor: pointer; font-family: 'Inter', sans-serif; font-weight: 600; transition: transform .12s ease, opacity .12s ease; }
         .btn:active { transform: scale(0.97); }
-        .btn:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid #8A6D3B; outline-offset: 2px; }
+        .btn:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid #C9A227; outline-offset: 2px; }
         input, textarea, select { font-family: 'Inter', sans-serif; }
       `}</style>
 
       <Header tab={tab} setTab={setTab} />
 
       {loading ? (
-        <div style={{ padding: 60, textAlign: "center", color: "#8a7f74" }}>Cargando catálogo…</div>
+        <div style={{ padding: 60, textAlign: "center", color: "#9A948C" }}>Cargando catálogo…</div>
       ) : tab === "tienda" ? (
         <Store products={products} email={email} flash={flash} />
       ) : authed ? (
-        <Admin products={products} setProducts={persistProducts} email={email} setEmail={persistEmail} adminSecret={adminSecret} flash={flash} />
+        <Admin email={email} setEmail={persistEmail} adminSecret={adminSecret} onCatalogChanged={refreshPublicProducts} flash={flash} />
       ) : (
         <AdminGate onSuccess={(secret) => { setAdminSecret(secret); setAuthed(true); }} />
       )}
 
       {toast && (
-        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "#20191c", color: "#FBF8F3", padding: "12px 22px", borderRadius: 8, fontSize: 14, fontWeight: 500, boxShadow: "0 8px 24px rgba(0,0,0,0.25)", zIndex: 200 }}>
+        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "#F2EFEA", color: "#0A0A0A", padding: "12px 22px", borderRadius: 8, fontSize: 14, fontWeight: 500, boxShadow: "0 8px 24px rgba(0,0,0,0.25)", zIndex: 200 }}>
           {toast}
         </div>
       )}
@@ -142,16 +138,13 @@ export default function App() {
 
 function Header({ tab, setTab }) {
   return (
-    <div style={{ borderBottom: "1px solid #E7DFD3", background: "#FBF8F3", position: "sticky", top: 0, zIndex: 50 }}>
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "18px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-          <span style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 26 }}>Essence</span>
-          <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: "#8A6D3B" }}>Perfumería</span>
-        </div>
-        <div style={{ display: "flex", gap: 4, background: "#F0E9DC", padding: 4, borderRadius: 10 }}>
+    <div style={{ borderBottom: "1px solid #2A2A2A", background: "#0A0A0A", position: "sticky", top: 0, zIndex: 50 }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <img src="/logo.jpg" alt="PC. Perfumería Boutique" style={{ height: 48, width: 48, borderRadius: 8, objectFit: "cover" }} />
+        <div style={{ display: "flex", gap: 4, background: "#1C1C1C", padding: 4, borderRadius: 10 }}>
           {[["tienda", "Tienda"], ["admin", "Admin"]].map(([key, label]) => (
             <button key={key} className="btn" onClick={() => setTab(key)}
-              style={{ padding: "8px 18px", borderRadius: 7, background: tab === key ? "#20191c" : "transparent", color: tab === key ? "#FBF8F3" : "#5c5148", fontSize: 13.5 }}>
+              style={{ padding: "8px 18px", borderRadius: 7, background: tab === key ? "#F2EFEA" : "transparent", color: tab === key ? "#0A0A0A" : "#C9C2B6", fontSize: 13.5 }}>
               {label}
             </button>
           ))}
@@ -169,6 +162,12 @@ function Store({ products, email, flash }) {
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState("relevancia");
   const [onlyInStock, setOnlyInStock] = useState(false);
+  const [marcaFilter, setMarcaFilter] = useState("");
+
+  const marcas = useMemo(() => {
+    const set = new Set(products.map((p) => p.marca).filter(Boolean));
+    return Array.from(set).sort();
+  }, [products]);
 
   const cartItems = useMemo(() => Object.entries(cart)
     .map(([id, qty]) => ({ product: products.find((p) => p.id === id), qty }))
@@ -181,6 +180,7 @@ function Store({ products, email, flash }) {
     const q = query.trim().toLowerCase();
     let list = products.filter((p) => {
       if (onlyInStock && p.stock <= 0) return false;
+      if (marcaFilter && p.marca !== marcaFilter) return false;
       if (!q) return true;
       return p.sku.toLowerCase().includes(q) || p.description.toLowerCase().includes(q);
     });
@@ -189,7 +189,7 @@ function Store({ products, email, flash }) {
     if (sortBy === "nombre-asc") list = [...list].sort((a, b) => a.description.localeCompare(b.description));
     if (sortBy === "nombre-desc") list = [...list].sort((a, b) => b.description.localeCompare(a.description));
     return list;
-  }, [products, query, sortBy, onlyInStock]);
+  }, [products, query, sortBy, onlyInStock, marcaFilter]);
 
   function setQty(id, qty, stock) {
     const clamped = Math.max(0, Math.min(qty, stock));
@@ -200,25 +200,32 @@ function Store({ products, email, flash }) {
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "36px 24px 120px" }}>
       <div style={{ marginBottom: 32 }}>
         <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 400, fontSize: 34, margin: 0 }}>Catálogo</h1>
-        <p style={{ color: "#8a7f74", marginTop: 6, fontSize: 14.5 }}>Elegí tus fragancias y armá el pedido. Te confirmamos por mail.</p>
+        <p style={{ color: "#9A948C", marginTop: 6, fontSize: 14.5 }}>Elegí tus fragancias y armá el pedido. Te confirmamos por mail.</p>
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 26, alignItems: "center" }}>
         <div style={{ position: "relative", flex: "1 1 240px", minWidth: 220 }}>
-          <Search size={16} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#8a7f74" }} />
+          <Search size={16} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#9A948C" }} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por SKU o nombre…"
-            style={{ width: "100%", padding: "11px 12px 11px 36px", borderRadius: 9, border: "1px solid #E7DFD3", fontSize: 14, background: "#fff" }} />
+            style={{ width: "100%", padding: "11px 12px 11px 36px", borderRadius: 9, border: "1px solid #2A2A2A", fontSize: 14, background: "#141414" }} />
         </div>
         <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}
-          style={{ padding: "11px 12px", borderRadius: 9, border: "1px solid #E7DFD3", fontSize: 13.5, background: "#fff", color: "#3a322c" }}>
+          style={{ padding: "11px 12px", borderRadius: 9, border: "1px solid #2A2A2A", fontSize: 13.5, background: "#141414", color: "#EDE8DF" }}>
           <option value="relevancia">Orden: relevancia</option>
           <option value="precio-asc">Precio: menor a mayor</option>
           <option value="precio-desc">Precio: mayor a menor</option>
           <option value="nombre-asc">Nombre: A-Z</option>
           <option value="nombre-desc">Nombre: Z-A</option>
         </select>
+        {marcas.length > 0 && (
+          <select value={marcaFilter} onChange={(e) => setMarcaFilter(e.target.value)}
+            style={{ padding: "11px 12px", borderRadius: 9, border: "1px solid #2A2A2A", fontSize: 13.5, background: "#141414", color: "#EDE8DF" }}>
+            <option value="">Todas las marcas</option>
+            {marcas.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
+        )}
         <button className="btn" onClick={() => setOnlyInStock((v) => !v)}
-          style={{ padding: "11px 16px", borderRadius: 9, background: onlyInStock ? "#20191c" : "#F0E9DC", color: onlyInStock ? "#fff" : "#5c5148", fontSize: 13.5, whiteSpace: "nowrap" }}>
+          style={{ padding: "11px 16px", borderRadius: 9, background: onlyInStock ? "#F2EFEA" : "#1C1C1C", color: onlyInStock ? "#0A0A0A" : "#C9C2B6", fontSize: 13.5, whiteSpace: "nowrap" }}>
           Solo con stock
         </button>
       </div>
@@ -237,7 +244,7 @@ function Store({ products, email, flash }) {
 
       {cartCount > 0 && (
         <button className="btn" onClick={() => setShowCheckout(true)}
-          style={{ position: "fixed", bottom: 24, right: 24, background: "#20191c", color: "#FBF8F3", borderRadius: 50, padding: "14px 24px", display: "flex", alignItems: "center", gap: 10, boxShadow: "0 10px 30px rgba(0,0,0,0.3)", fontSize: 14.5, zIndex: 90 }}>
+          style={{ position: "fixed", bottom: 24, right: 24, background: "#F2EFEA", color: "#0A0A0A", borderRadius: 50, padding: "14px 24px", display: "flex", alignItems: "center", gap: 10, boxShadow: "0 10px 30px rgba(0,0,0,0.3)", fontSize: 14.5, zIndex: 90 }}>
           <ShoppingBag size={18} /> {cartCount} · {money(total)}
         </button>
       )}
@@ -257,34 +264,37 @@ function Store({ products, email, flash }) {
 function ProductCard({ product, qty, onQty }) {
   const outOfStock = product.stock <= 0;
   return (
-    <div style={{ background: "#fff", border: "1px solid #EEE6D9", borderRadius: 12, overflow: "hidden", display: "flex", height: 148 }}>
-      <div style={{ position: "relative", width: 148, flexShrink: 0, background: "#F5F0E6" }}>
+    <div style={{ background: "#141414", border: "1px solid #242424", borderRadius: 12, overflow: "hidden", display: "flex", height: 148 }}>
+      <div style={{ position: "relative", width: 148, flexShrink: 0, background: "#151515" }}>
         {product.image ? (
           <img src={product.image} alt={product.sku} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         ) : (
           <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <ImageIcon size={26} color="#C9BC9F" />
+            <ImageIcon size={26} color="#5A5A5A" />
           </div>
         )}
-        <span style={{ position: "absolute", bottom: 0, left: 0, right: 0, fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, letterSpacing: 1.5, color: "#FBF8F3", background: "rgba(32,25,28,0.65)", padding: "3px 8px" }}>
+        <span style={{ position: "absolute", bottom: 0, left: 0, right: 0, fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, letterSpacing: 1.5, color: "#0A0A0A", background: "rgba(32,25,28,0.65)", padding: "3px 8px" }}>
           {product.sku}
         </span>
       </div>
-      <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8, flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13.5, lineHeight: 1.4, color: "#3a322c", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+      <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 6, flex: 1, minWidth: 0 }}>
+        {product.marca && (
+          <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "#C9A227" }}>{product.marca}</span>
+        )}
+        <div style={{ fontSize: 13.5, lineHeight: 1.4, color: "#EDE8DF", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
           {product.description || "Sin descripción"}
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ fontFamily: "'Fraunces', serif", fontSize: 19 }}>{money(product.price)}</span>
-          <span style={{ fontSize: 11.5, color: outOfStock ? "#B4483C" : "#7C8A63", fontWeight: 600 }}>
+          <span style={{ fontSize: 11.5, color: outOfStock ? "#B4483C" : "#9BC17F", fontWeight: 600 }}>
             {outOfStock ? "Sin stock" : `Stock: ${product.stock}`}
           </span>
         </div>
         <div style={{ marginTop: "auto" }}>
           {outOfStock ? (
-            <div style={{ textAlign: "center", fontSize: 12.5, color: "#8a7f74", padding: "8px 0" }}>No disponible</div>
+            <div style={{ textAlign: "center", fontSize: 12.5, color: "#9A948C", padding: "8px 0" }}>No disponible</div>
           ) : (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#F5F0E6", borderRadius: 8, padding: 4 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#151515", borderRadius: 8, padding: 4 }}>
               <button className="btn" onClick={() => onQty(qty - 1)} disabled={qty === 0} style={{ background: "transparent", width: 28, height: 28, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", opacity: qty === 0 ? 0.35 : 1 }}>
                 <Minus size={13} />
               </button>
@@ -302,7 +312,7 @@ function ProductCard({ product, qty, onQty }) {
 
 function EmptyState({ text }) {
   return (
-    <div style={{ border: "1px dashed #D9CDB8", borderRadius: 12, padding: "48px 24px", textAlign: "center", color: "#8a7f74" }}>
+    <div style={{ border: "1px dashed #3A3A3A", borderRadius: 12, padding: "48px 24px", textAlign: "center", color: "#9A948C" }}>
       <Package size={28} style={{ marginBottom: 10, opacity: 0.6 }} />
       <div style={{ fontSize: 14.5 }}>{text}</div>
     </div>
@@ -388,28 +398,28 @@ function Checkout({ cartItems, total, email, onQty, onRemove, onReset, onClose, 
     onDone();
   }
 
-  const inputStyle = (field) => ({ width: "100%", padding: "11px 12px", borderRadius: 8, border: `1px solid ${errors[field] ? "#B4483C" : "#E7DFD3"}`, fontSize: 14, background: "#fff" });
-  const label = { fontSize: 12.5, fontWeight: 600, color: "#5c5148", marginBottom: 5, display: "block" };
+  const inputStyle = (field) => ({ width: "100%", padding: "11px 12px", borderRadius: 8, border: `1px solid ${errors[field] ? "#B4483C" : "#2A2A2A"}`, fontSize: 14, background: "#141414" });
+  const label = { fontSize: 12.5, fontWeight: 600, color: "#C9C2B6", marginBottom: 5, display: "block" };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(32,25,28,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 150, padding: 20 }} onClick={onClose}>
-      <div style={{ background: "#FBF8F3", borderRadius: 14, width: "100%", maxWidth: 480, maxHeight: "88vh", overflowY: "auto", padding: 26 }} onClick={(e) => e.stopPropagation()}>
+      <div style={{ background: "#0A0A0A", borderRadius: 14, width: "100%", maxWidth: 480, maxHeight: "88vh", overflowY: "auto", padding: 26 }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 400, fontSize: 22, margin: 0 }}>Datos del pedido</h2>
           <button className="btn" onClick={onClose} style={{ background: "transparent", padding: 6 }}><X size={20} /></button>
         </div>
 
-        <div style={{ background: "#F0E9DC", borderRadius: 10, padding: 14, marginBottom: 18 }}>
+        <div style={{ background: "#1C1C1C", borderRadius: 10, padding: 14, marginBottom: 18 }}>
           {cartItems.length === 0 ? (
-            <div style={{ fontSize: 13, color: "#8a7f74", textAlign: "center", padding: "10px 0" }}>El carrito quedó vacío.</div>
+            <div style={{ fontSize: 13, color: "#9A948C", textAlign: "center", padding: "10px 0" }}>El carrito quedó vacío.</div>
           ) : (
             cartItems.map((c) => (
-              <div key={c.product.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #E0D3B8" }}>
+              <div key={c.product.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid #2E2E2E" }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, fontFamily: "'IBM Plex Mono', monospace" }}>{c.product.sku}</div>
-                  <div style={{ fontSize: 11.5, color: "#8a7f74" }}>{money(c.product.price)} c/u</div>
+                  <div style={{ fontSize: 11.5, color: "#9A948C" }}>{money(c.product.price)} c/u</div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4, background: "#fff", borderRadius: 7, padding: 3 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, background: "#141414", borderRadius: 7, padding: 3 }}>
                   <button className="btn" onClick={() => onQty(c.product.id, c.qty - 1, c.product.stock)} style={{ background: "transparent", width: 24, height: 24, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <Minus size={12} />
                   </button>
@@ -425,12 +435,12 @@ function Checkout({ cartItems, total, email, onQty, onRemove, onReset, onClose, 
               </div>
             ))
           )}
-          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, marginTop: 10, paddingTop: 8, borderTop: "1px solid #E0D3B8" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, marginTop: 10, paddingTop: 8, borderTop: "1px solid #2E2E2E" }}>
             <span>Total</span><span>{money(total)}</span>
           </div>
         </div>
 
-        <button className="btn" onClick={onReset} style={{ width: "100%", background: "transparent", color: "#8a7f74", border: "1px solid #E7DFD3", padding: "9px 0", borderRadius: 8, fontSize: 12.5, marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+        <button className="btn" onClick={onReset} style={{ width: "100%", background: "transparent", color: "#9A948C", border: "1px solid #2A2A2A", padding: "9px 0", borderRadius: 8, fontSize: 12.5, marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
           <RotateCcw size={13} /> Empezar de nuevo
         </button>
 
@@ -446,7 +456,7 @@ function Checkout({ cartItems, total, email, onQty, onRemove, onReset, onClose, 
           <div style={{ display: "flex", gap: 8 }}>
             {["DNI", "CUIT"].map((t) => (
               <button key={t} className="btn" onClick={() => update("tipoDoc", t)}
-                style={{ flex: 1, padding: "10px 0", borderRadius: 8, background: form.tipoDoc === t ? "#20191c" : "#F0E9DC", color: form.tipoDoc === t ? "#fff" : "#5c5148", fontSize: 13.5 }}>
+                style={{ flex: 1, padding: "10px 0", borderRadius: 8, background: form.tipoDoc === t ? "#F2EFEA" : "#1C1C1C", color: form.tipoDoc === t ? "#0A0A0A" : "#C9C2B6", fontSize: 13.5 }}>
                 {t}
               </button>
             ))}
@@ -469,7 +479,7 @@ function Checkout({ cartItems, total, email, onQty, onRemove, onReset, onClose, 
           <div style={{ display: "flex", gap: 8 }}>
             {[["efectivo", "Efectivo en local"], ["mercadopago", "Mercado Pago"]].map(([val, lbl]) => (
               <button key={val} className="btn" onClick={() => { update("pago", val); setMpStatus("idle"); }}
-                style={{ flex: 1, padding: "10px 8px", borderRadius: 8, background: form.pago === val ? "#20191c" : "#F0E9DC", color: form.pago === val ? "#fff" : "#5c5148", fontSize: 13 }}>
+                style={{ flex: 1, padding: "10px 8px", borderRadius: 8, background: form.pago === val ? "#F2EFEA" : "#1C1C1C", color: form.pago === val ? "#0A0A0A" : "#C9C2B6", fontSize: 13 }}>
                 {lbl}
               </button>
             ))}
@@ -494,7 +504,7 @@ function Checkout({ cartItems, total, email, onQty, onRemove, onReset, onClose, 
           </button>
         ) : (
           <button className="btn" onClick={submit} disabled={cartItems.length === 0}
-            style={{ width: "100%", background: "#20191c", color: "#fff", padding: "13px 0", borderRadius: 9, fontSize: 14.5, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: cartItems.length === 0 ? 0.4 : 1 }}>
+            style={{ width: "100%", background: "#F2EFEA", color: "#0A0A0A", padding: "13px 0", borderRadius: 9, fontSize: 14.5, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: cartItems.length === 0 ? 0.4 : 1 }}>
             <Mail size={16} /> Enviar pedido por mail
           </button>
         )}
@@ -525,8 +535,8 @@ function AdminGate({ onSuccess }) {
 
   return (
     <div style={{ maxWidth: 380, margin: "60px auto", padding: "0 24px" }}>
-      <div style={{ background: "#fff", border: "1px solid #EEE6D9", borderRadius: 14, padding: 28 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, color: "#8A6D3B" }}>
+      <div style={{ background: "#141414", border: "1px solid #242424", borderRadius: 14, padding: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, color: "#C9A227" }}>
           <Lock size={16} />
           <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>Acceso admin</span>
         </div>
@@ -534,7 +544,7 @@ function AdminGate({ onSuccess }) {
         <div style={{ marginBottom: 16 }}>
           <input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleLogin()}
             placeholder="ADMIN_SECRET"
-            style={{ width: "100%", padding: "11px 12px", borderRadius: 8, border: "1px solid #E7DFD3", fontSize: 14 }} />
+            style={{ width: "100%", padding: "11px 12px", borderRadius: 8, border: "1px solid #2A2A2A", fontSize: 14 }} />
         </div>
         {error && (
           <div style={{ display: "flex", gap: 6, alignItems: "center", color: "#B4483C", fontSize: 12.5, marginBottom: 14 }}>
@@ -542,10 +552,10 @@ function AdminGate({ onSuccess }) {
           </div>
         )}
         <button className="btn" onClick={handleLogin} disabled={busy}
-          style={{ width: "100%", background: "#20191c", color: "#fff", padding: "12px 0", borderRadius: 9, fontSize: 14 }}>
+          style={{ width: "100%", background: "#F2EFEA", color: "#0A0A0A", padding: "12px 0", borderRadius: 9, fontSize: 14 }}>
           {busy ? "Verificando…" : "Entrar"}
         </button>
-        <p style={{ fontSize: 11.5, color: "#8a7f74", marginTop: 14, lineHeight: 1.5 }}>
+        <p style={{ fontSize: 11.5, color: "#9A948C", marginTop: 14, lineHeight: 1.5 }}>
           Es la misma clave <code>ADMIN_SECRET</code> que configuraste al desplegar el servidor. Sesión válida hasta que recargues la página.
         </p>
       </div>
@@ -553,7 +563,9 @@ function AdminGate({ onSuccess }) {
   );
 }
 
-function Admin({ products, setProducts, email, setEmail, adminSecret, flash }) {
+function Admin({ email, setEmail, adminSecret, onCatalogChanged, flash }) {
+  const [products, setProductsState] = useState([]);
+  const [productsLoaded, setProductsLoaded] = useState(false);
   const [preview, setPreview] = useState(null);
   const [mpToken, setMpToken] = useState("");
   const [mpStatus, setMpStatus] = useState("checking");
@@ -561,8 +573,25 @@ function Admin({ products, setProducts, email, setEmail, adminSecret, flash }) {
   const fileRef = useRef();
 
   useEffect(() => {
+    api("/api/admin/products", { headers: { "x-admin-secret": adminSecret } })
+      .then((p) => { setProductsState(p); setProductsLoaded(true); })
+      .catch(() => flash("No se pudo cargar el catálogo."));
     api("/api/mp-status").then((d) => setMpStatus(d.connected ? "connected" : "disconnected")).catch(() => setMpStatus("unknown"));
   }, []);
+
+  async function setProducts(next) {
+    setProductsState(next);
+    try {
+      await api("/api/admin/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-admin-secret": adminSecret },
+        body: JSON.stringify(next),
+      });
+      onCatalogChanged();
+    } catch {
+      flash("No se pudo guardar el catálogo. Reintentá.");
+    }
+  }
 
   async function loadOrders() {
     try {
@@ -640,58 +669,60 @@ function Admin({ products, setProducts, email, setEmail, adminSecret, flash }) {
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", padding: "36px 24px 80px" }}>
       <h1 style={{ fontFamily: "'Fraunces', serif", fontWeight: 400, fontSize: 30, marginBottom: 6 }}>Panel admin</h1>
-      <p style={{ color: "#8a7f74", fontSize: 14, marginBottom: 28 }}>Cargá el catálogo, gestioná pedidos y conectá Mercado Pago.</p>
+      <p style={{ color: "#9A948C", fontSize: 14, marginBottom: 28 }}>Cargá el catálogo, gestioná pedidos y conectá Mercado Pago.</p>
 
       <Section icon={<Mail size={16} />} title="Mail de destino de los pedidos">
         <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="pedidos@perfumeria.com"
-          style={{ width: "100%", maxWidth: 380, padding: "11px 12px", borderRadius: 8, border: "1px solid #E7DFD3", fontSize: 14 }} />
+          style={{ width: "100%", maxWidth: 380, padding: "11px 12px", borderRadius: 8, border: "1px solid #2A2A2A", fontSize: 14 }} />
       </Section>
 
       <Section icon={<CreditCard size={16} />} title="Mercado Pago">
         <div style={{ marginBottom: 14 }}>
-          {mpStatus === "connected" && <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#0F6E56", fontSize: 13, fontWeight: 600 }}><Check size={15} /> Conectado</span>}
-          {mpStatus === "disconnected" && <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#8A6D3B", fontSize: 13, fontWeight: 600 }}><AlertCircle size={15} /> Todavía no conectado</span>}
-          {mpStatus === "checking" && <span style={{ fontSize: 13, color: "#8a7f74" }}>Verificando…</span>}
+          {mpStatus === "connected" && <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#3FBF9E", fontSize: 13, fontWeight: 600 }}><Check size={15} /> Conectado</span>}
+          {mpStatus === "disconnected" && <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#C9A227", fontSize: 13, fontWeight: 600 }}><AlertCircle size={15} /> Todavía no conectado</span>}
+          {mpStatus === "checking" && <span style={{ fontSize: 13, color: "#9A948C" }}>Verificando…</span>}
         </div>
         <div style={{ marginBottom: 12 }}>
           <input type="password" value={mpToken} onChange={(e) => setMpToken(e.target.value)} placeholder="Access Token de producción (APP_USR-...)"
-            style={{ width: "100%", maxWidth: 420, padding: "11px 12px", borderRadius: 8, border: "1px solid #E7DFD3", fontSize: 14 }} />
+            style={{ width: "100%", maxWidth: 420, padding: "11px 12px", borderRadius: 8, border: "1px solid #2A2A2A", fontSize: 14 }} />
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <button className="btn" onClick={connectMp} style={{ background: "#009EE3", color: "#fff", padding: "10px 18px", borderRadius: 8, fontSize: 13.5 }}>Conectar</button>
           {mpStatus === "connected" && (
-            <button className="btn" onClick={disconnectMp} style={{ background: "transparent", color: "#B4483C", border: "1px solid #E7DFD3", padding: "10px 18px", borderRadius: 8, fontSize: 13.5 }}>Desconectar</button>
+            <button className="btn" onClick={disconnectMp} style={{ background: "transparent", color: "#B4483C", border: "1px solid #2A2A2A", padding: "10px 18px", borderRadius: 8, fontSize: 13.5 }}>Desconectar</button>
           )}
         </div>
       </Section>
 
       <Section icon={<Upload size={16} />} title="Cargar catálogo desde Excel">
-        <p style={{ fontSize: 12.5, color: "#8a7f74", marginTop: -6, marginBottom: 12 }}>
+        <p style={{ fontSize: 12.5, color: "#9A948C", marginTop: -6, marginBottom: 12 }}>
           Columnas reconocidas: <strong>Codigo</strong> (o SKU), <strong>Stock</strong>, <strong>Lista1</strong> (o Precio), <strong>Descripcion</strong>. El resto de las columnas de tu Excel (Rubro, Marca, Precio Compra, etc.) se ignoran. <strong>Al confirmar, reemplaza todo el catálogo actual</strong> — los productos que no estén en este Excel se borran de la tienda. Si un SKU ya existía, conserva su foto automáticamente.
         </p>
         <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleExcel} style={{ display: "none" }} />
-        <button className="btn" onClick={() => fileRef.current.click()} style={{ background: "#20191c", color: "#fff", padding: "10px 18px", borderRadius: 8, fontSize: 13.5, display: "flex", alignItems: "center", gap: 8 }}>
+        <button className="btn" onClick={() => fileRef.current.click()} style={{ background: "#F2EFEA", color: "#0A0A0A", padding: "10px 18px", borderRadius: 8, fontSize: 13.5, display: "flex", alignItems: "center", gap: 8 }}>
           <Upload size={15} /> Elegir archivo .xlsx
         </button>
       </Section>
 
       {preview && (
         <Section icon={<Check size={16} />} title={`Previsualización (${preview.length} filas)`}>
-          <div style={{ display: "flex", gap: 6, alignItems: "center", color: "#8A6D3B", fontSize: 12.5, marginTop: -4, marginBottom: 12 }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", color: "#C9A227", fontSize: 12.5, marginTop: -4, marginBottom: 12 }}>
             <AlertCircle size={14} /> Al confirmar, se van a borrar los {products.length} productos actuales y quedar solo estos {preview.length}.
           </div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
-                <tr style={{ textAlign: "left", color: "#8a7f74", fontSize: 11.5, textTransform: "uppercase" }}>
-                  <th style={{ padding: "6px 8px" }}>Foto</th><th style={{ padding: "6px 8px" }}>SKU</th><th style={{ padding: "6px 8px" }}>Stock</th><th style={{ padding: "6px 8px" }}>Precio</th><th style={{ padding: "6px 8px" }}>Descripción</th>
+                <tr style={{ textAlign: "left", color: "#9A948C", fontSize: 11.5, textTransform: "uppercase" }}>
+                  <th style={{ padding: "6px 8px" }}>Foto</th><th style={{ padding: "6px 8px" }}>SKU</th><th style={{ padding: "6px 8px" }}>Marca</th><th style={{ padding: "6px 8px" }}>Rubro</th><th style={{ padding: "6px 8px" }}>Stock</th><th style={{ padding: "6px 8px" }}>Precio</th><th style={{ padding: "6px 8px" }}>Descripción</th>
                 </tr>
               </thead>
               <tbody>
                 {preview.map((p, idx) => (
-                  <tr key={p.id} style={{ borderTop: "1px solid #EEE6D9" }}>
+                  <tr key={p.id} style={{ borderTop: "1px solid #242424" }}>
                     <td style={{ padding: "8px" }}><ImagePicker image={p.image} onPick={(f) => attachImage(idx, f)} /></td>
                     <td style={{ padding: "8px", fontFamily: "'IBM Plex Mono', monospace" }}>{p.sku}</td>
+                    <td style={{ padding: "8px" }}>{p.marca}</td>
+                    <td style={{ padding: "8px", color: "#9A948C" }}>{p.rubro}</td>
                     <td style={{ padding: "8px" }}>{p.stock}</td>
                     <td style={{ padding: "8px" }}>{money(p.price)}</td>
                     <td style={{ padding: "8px", maxWidth: 260 }}>{p.description}</td>
@@ -701,46 +732,51 @@ function Admin({ products, setProducts, email, setEmail, adminSecret, flash }) {
             </table>
           </div>
           <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-            <button className="btn" onClick={confirmImport} style={{ background: "#20191c", color: "#fff", padding: "10px 18px", borderRadius: 8, fontSize: 13.5 }}>Reemplazar catálogo</button>
-            <button className="btn" onClick={() => setPreview(null)} style={{ background: "#F0E9DC", color: "#5c5148", padding: "10px 18px", borderRadius: 8, fontSize: 13.5 }}>Cancelar</button>
+            <button className="btn" onClick={confirmImport} style={{ background: "#F2EFEA", color: "#0A0A0A", padding: "10px 18px", borderRadius: 8, fontSize: 13.5 }}>Reemplazar catálogo</button>
+            <button className="btn" onClick={() => setPreview(null)} style={{ background: "#1C1C1C", color: "#C9C2B6", padding: "10px 18px", borderRadius: 8, fontSize: 13.5 }}>Cancelar</button>
           </div>
         </Section>
       )}
 
       <Section icon={<Package size={16} />} title={`Catálogo actual (${products.length})`}>
-        {products.length === 0 ? <EmptyState text="Sin productos todavía." /> : (
+        {!productsLoaded ? (
+          <div style={{ padding: 20, textAlign: "center", color: "#9A948C", fontSize: 13 }}>Cargando…</div>
+        ) : products.length === 0 ? <EmptyState text="Sin productos todavía." /> : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ fontSize: 11.5, color: "#9A948C", marginBottom: -2 }}>El Rubro es solo para uso interno — nunca se muestra en la tienda pública.</div>
             {products.map((p) => (
-              <div key={p.id} style={{ display: "grid", gridTemplateColumns: "56px 110px 90px 110px 1fr 32px", gap: 10, alignItems: "center", background: "#fff", border: "1px solid #EEE6D9", borderRadius: 10, padding: 10 }}>
+              <div key={p.id} style={{ display: "grid", gridTemplateColumns: "56px 100px 100px 100px 80px 100px 1fr 32px", gap: 10, alignItems: "center", background: "#141414", border: "1px solid #242424", borderRadius: 10, padding: 10 }}>
                 <ImagePicker image={p.image} onPick={(f) => updateImage(p.id, f)} small />
-                <input value={p.sku} onChange={(e) => updateProduct(p.id, "sku", e.target.value)} placeholder="SKU" style={{ padding: "7px 8px", borderRadius: 6, border: "1px solid #E7DFD3", fontSize: 12.5, fontFamily: "'IBM Plex Mono', monospace" }} />
-                <input type="number" value={p.stock} onChange={(e) => updateProduct(p.id, "stock", e.target.value)} placeholder="Stock" style={{ padding: "7px 8px", borderRadius: 6, border: "1px solid #E7DFD3", fontSize: 12.5 }} />
-                <input type="number" value={p.price} onChange={(e) => updateProduct(p.id, "price", e.target.value)} placeholder="Precio" style={{ padding: "7px 8px", borderRadius: 6, border: "1px solid #E7DFD3", fontSize: 12.5 }} />
-                <input value={p.description} onChange={(e) => updateProduct(p.id, "description", e.target.value)} placeholder="Descripción" style={{ padding: "7px 8px", borderRadius: 6, border: "1px solid #E7DFD3", fontSize: 12.5 }} />
+                <input value={p.sku} onChange={(e) => updateProduct(p.id, "sku", e.target.value)} placeholder="SKU" style={{ padding: "7px 8px", borderRadius: 6, border: "1px solid #2A2A2A", fontSize: 12.5, fontFamily: "'IBM Plex Mono', monospace" }} />
+                <input value={p.marca || ""} onChange={(e) => updateProduct(p.id, "marca", e.target.value)} placeholder="Marca" style={{ padding: "7px 8px", borderRadius: 6, border: "1px solid #2A2A2A", fontSize: 12.5 }} />
+                <input value={p.rubro || ""} onChange={(e) => updateProduct(p.id, "rubro", e.target.value)} placeholder="Rubro (interno)" style={{ padding: "7px 8px", borderRadius: 6, border: "1px solid #2A2A2A", fontSize: 12.5, background: "#0A0A0A" }} />
+                <input type="number" value={p.stock} onChange={(e) => updateProduct(p.id, "stock", e.target.value)} placeholder="Stock" style={{ padding: "7px 8px", borderRadius: 6, border: "1px solid #2A2A2A", fontSize: 12.5 }} />
+                <input type="number" value={p.price} onChange={(e) => updateProduct(p.id, "price", e.target.value)} placeholder="Precio" style={{ padding: "7px 8px", borderRadius: 6, border: "1px solid #2A2A2A", fontSize: 12.5 }} />
+                <input value={p.description} onChange={(e) => updateProduct(p.id, "description", e.target.value)} placeholder="Descripción" style={{ padding: "7px 8px", borderRadius: 6, border: "1px solid #2A2A2A", fontSize: 12.5 }} />
                 <button className="btn" onClick={() => removeProduct(p.id)} style={{ background: "transparent", color: "#B4483C", padding: 6, display: "flex", justifyContent: "center" }}><Trash2 size={16} /></button>
               </div>
             ))}
           </div>
         )}
-        <button className="btn" onClick={addBlank} style={{ marginTop: 14, background: "#F0E9DC", color: "#5c5148", padding: "9px 16px", borderRadius: 8, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+        <button className="btn" onClick={addBlank} style={{ marginTop: 14, background: "#1C1C1C", color: "#C9C2B6", padding: "9px 16px", borderRadius: 8, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
           <Plus size={14} /> Agregar producto manual
         </button>
       </Section>
 
       <Section icon={<ListOrdered size={16} />} title="Pedidos recibidos">
         {orders === null ? (
-          <button className="btn" onClick={loadOrders} style={{ background: "#F0E9DC", color: "#5c5148", padding: "9px 16px", borderRadius: 8, fontSize: 13 }}>Cargar pedidos</button>
+          <button className="btn" onClick={loadOrders} style={{ background: "#1C1C1C", color: "#C9C2B6", padding: "9px 16px", borderRadius: 8, fontSize: 13 }}>Cargar pedidos</button>
         ) : orders.length === 0 ? (
           <EmptyState text="Todavía no llegó ningún pedido." />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {orders.map((o) => (
-              <div key={o.id} style={{ background: "#fff", border: "1px solid #EEE6D9", borderRadius: 10, padding: 12, fontSize: 13 }}>
+              <div key={o.id} style={{ background: "#141414", border: "1px solid #242424", borderRadius: 10, padding: 12, fontSize: 13 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600 }}>
                   <span>{o.nombre} {o.apellido}</span>
                   <span>{money(o.total)}</span>
                 </div>
-                <div style={{ color: "#8a7f74", fontSize: 12, marginTop: 2 }}>
+                <div style={{ color: "#9A948C", fontSize: 12, marginTop: 2 }}>
                   {o.tipoDoc}: {o.documento} · WhatsApp: {o.whatsapp} · Pago: {o.pago === "mercadopago" ? "Mercado Pago" : "Efectivo"} · {new Date(o.createdAt).toLocaleString("es-AR")}
                 </div>
               </div>
@@ -755,8 +791,8 @@ function Admin({ products, setProducts, email, setEmail, adminSecret, flash }) {
 function Section({ icon, title, children }) {
   return (
     <div style={{ marginBottom: 26 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, color: "#5c5148" }}>{icon}<h3 style={{ fontSize: 14.5, margin: 0, fontWeight: 600 }}>{title}</h3></div>
-      <div style={{ background: "#FBF8F3", border: "1px solid #EEE6D9", borderRadius: 12, padding: 18 }}>{children}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, color: "#C9C2B6" }}>{icon}<h3 style={{ fontSize: 14.5, margin: 0, fontWeight: 600 }}>{title}</h3></div>
+      <div style={{ background: "#0A0A0A", border: "1px solid #242424", borderRadius: 12, padding: 18 }}>{children}</div>
     </div>
   );
 }
@@ -768,8 +804,8 @@ function ImagePicker({ image, onPick, small }) {
     <>
       <input ref={ref} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => e.target.files[0] && onPick(e.target.files[0])} />
       <button className="btn" onClick={() => ref.current.click()}
-        style={{ width: size, height: size, borderRadius: 8, background: "#F0E9DC", border: "1px solid #E7DFD3", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", padding: 0 }}>
-        {image ? <img src={image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ImageIcon size={16} color="#8A6D3B" />}
+        style={{ width: size, height: size, borderRadius: 8, background: "#1C1C1C", border: "1px solid #2A2A2A", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", padding: 0 }}>
+        {image ? <img src={image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <ImageIcon size={16} color="#C9A227" />}
       </button>
     </>
   );
