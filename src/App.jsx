@@ -139,6 +139,7 @@ export default function App() {
       )}
 
       {tab !== "admin" && <Footer whatsappNumber={whatsappNumber} whatsappMessage={whatsappMessage} />}
+      {tab !== "admin" && <WhatsAppFloat whatsappNumber={whatsappNumber} whatsappMessage={whatsappMessage} />}
 
       {toast && (
         <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "#20191c", color: "#FBF8F3", padding: "12px 22px", borderRadius: 8, fontSize: 14, fontWeight: 500, boxShadow: "0 8px 24px rgba(0,0,0,0.25)", zIndex: 200 }}>
@@ -179,6 +180,17 @@ const HORARIOS = [
   ["Sábado", "9 a.m.–8 p.m."],
   ["Domingo", "9 a.m.–2 p.m."],
 ];
+
+function WhatsAppFloat({ whatsappNumber, whatsappMessage }) {
+  if (!whatsappNumber) return null;
+  const href = `https://wa.me/${whatsappNumber.replace(/[^\d]/g, "")}${whatsappMessage ? `?text=${encodeURIComponent(whatsappMessage)}` : ""}`;
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer"
+      style={{ position: "fixed", bottom: 24, left: 24, width: 54, height: 54, borderRadius: "50%", background: "#25D366", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 10px 30px rgba(0,0,0,0.3)", zIndex: 90 }}>
+      <MessageCircle size={26} color="#fff" />
+    </a>
+  );
+}
 
 function Footer({ whatsappNumber, whatsappMessage }) {
   const waHref = whatsappNumber
@@ -222,7 +234,6 @@ function Store({ products, email, flash }) {
   const [showCheckout, setShowCheckout] = useState(false);
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState("relevancia");
-  const [onlyInStock, setOnlyInStock] = useState(false);
   const [marcaFilter, setMarcaFilter] = useState("");
   const [rubroFilter, setRubroFilter] = useState("");
 
@@ -246,7 +257,6 @@ function Store({ products, email, flash }) {
   const visibleProducts = useMemo(() => {
     const q = query.trim().toLowerCase();
     let list = products.filter((p) => {
-      if (onlyInStock && p.stock <= 0) return false;
       if (marcaFilter && p.marca !== marcaFilter) return false;
       if (rubroFilter && p.rubro !== rubroFilter) return false;
       if (!q) return true;
@@ -257,7 +267,7 @@ function Store({ products, email, flash }) {
     if (sortBy === "nombre-asc") list = [...list].sort((a, b) => a.description.localeCompare(b.description));
     if (sortBy === "nombre-desc") list = [...list].sort((a, b) => b.description.localeCompare(a.description));
     return list;
-  }, [products, query, sortBy, onlyInStock, marcaFilter, rubroFilter]);
+  }, [products, query, sortBy, marcaFilter, rubroFilter]);
 
   function setQty(id, qty, stock) {
     const clamped = Math.max(0, Math.min(qty, stock));
@@ -307,10 +317,6 @@ function Store({ products, email, flash }) {
             {marcas.map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
         )}
-        <button className="btn" onClick={() => setOnlyInStock((v) => !v)}
-          style={{ padding: "11px 16px", borderRadius: 9, background: onlyInStock ? "#20191c" : "#F0E9DC", color: onlyInStock ? "#fff" : "#5c5148", fontSize: 13.5, whiteSpace: "nowrap" }}>
-          Solo con stock
-        </button>
       </div>
 
       {products.length === 0 ? (
