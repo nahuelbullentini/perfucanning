@@ -60,7 +60,7 @@ async function api(path, options = {}) {
 }
 
 export default function App() {
-  const [tab, setTab] = useState("tienda");
+  const [tab, setTab] = useState(() => (window.location.pathname.replace(/\/$/, "").toLowerCase() === "/admin" ? "admin" : "tienda"));
   const [products, setProducts] = useState([]);
   const [email, setEmail] = useState("");
   const [whatsappNumber, setWhatsappNumber] = useState("");
@@ -153,10 +153,13 @@ function Header({ tab, setTab }) {
   return (
     <div style={{ borderBottom: "1px solid #E7DFD3", background: "#FBF8F3", position: "sticky", top: 0, zIndex: 50 }}>
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <img src="/logo.png" alt="PC. Perfumería Boutique" style={{ height: 52, objectFit: "contain" }} />
+        <button className="btn" onClick={() => { setTab("tienda"); window.history.pushState({}, "", "/"); }}
+          style={{ background: "transparent", padding: 0, border: "none" }}>
+          <img src="/logo.png" alt="PC. Perfumería Boutique" style={{ height: 52, objectFit: "contain" }} />
+        </button>
         <div style={{ display: "flex", gap: 4, background: "#F0E9DC", padding: 4, borderRadius: 10 }}>
-          {[["tienda", "Tienda"], ["ofertas", "Ofertas"], ["admin", "Admin"]].map(([key, label]) => (
-            <button key={key} className="btn" onClick={() => setTab(key)}
+          {[["tienda", "Tienda"], ["ofertas", "Ofertas"]].map(([key, label]) => (
+            <button key={key} className="btn" onClick={() => { setTab(key); window.history.pushState({}, "", "/"); }}
               style={{ padding: "8px 18px", borderRadius: 7, background: tab === key ? "#20191c" : "transparent", color: tab === key ? "#FBF8F3" : "#5c5148", fontSize: 13.5 }}>
               {label}
             </button>
@@ -367,7 +370,7 @@ function ProductCard({ product, qty, onQty }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ fontFamily: "'Fraunces', serif", fontSize: 19 }}>{money(product.price)}</span>
           <span style={{ fontSize: 11.5, color: outOfStock ? "#B4483C" : "#7C8A63", fontWeight: 600 }}>
-            {outOfStock ? "Sin stock" : `Stock: ${product.stock}`}
+            {outOfStock ? "Sin stock" : `Stock: ${Math.max(0, product.stock)}`}
           </span>
         </div>
         <div style={{ marginTop: "auto" }}>
