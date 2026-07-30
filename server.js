@@ -20,6 +20,7 @@ import * as XLSX from "xlsx";
 const app = express();
 app.use(express.json({ limit: "20mb" })); // las fotos van como base64, pueden pesar
 app.use("/api/admin/import-excel", express.raw({ type: "*/*", limit: "20mb" }));
+app.use("/api/admin/upload-offers", express.raw({ type: "*/*", limit: "20mb" }));
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
@@ -29,6 +30,7 @@ const DATA_DIR = path.join(__dirname, "data");
 const CONFIG_PATH = path.join(DATA_DIR, "config.json");
 const PRODUCTS_PATH = path.join(DATA_DIR, "products.json");
 const ORDERS_PATH = path.join(DATA_DIR, "orders.json");
+const OFFERS_PDF_PATH = path.join(DATA_DIR, "ofertas.pdf");
 
 function readJSON(p, fallback) {
   try {
@@ -73,11 +75,25 @@ function requireAdmin(req, res, next) {
 app.get("/api/products", (req, res) => {
   const publicProducts = products
     .filter((p) => p.status !== "suspendido" && Number(p.price) > 0)
-    .map(({ rubro, status, ...rest }) => rest);
+    .map(({ status, ...rest }) => rest);
   res.json(publicProducts);
 });
 
-app.get("/api/config", (req, res) => res.json({ email: config.email || "" }));
+app.get("/api/config", (req, res) => res.json({
+  email: config.email || "",
+  whatsappNumber: config.whatsappNumber || "",
+  whatsappMessage: config.whatsappMessage || "",
+}));
+
+app.get("/api/offers", (req, res) => {
+  res.json({ available: fs.existsSync(OFFERS_PDF_PATH), updatedAt: config.offersUpdatedAt || null });
+});
+
+app.get("/api/offers.pdf", (req, res) => {
+  if (!fs.existsSync(OFFERS_PDF_PATH)) return res.status(404).send("No hay ofertas cargadas");
+  res.setHeader("Content-Type", "application/pdf");
+  res.sendFile(OFFERS_PDF_PATH);
+});
 
 app.post("/api/orders", (req, res) => {
   const order = {
@@ -205,7 +221,27 @@ app.put("/api/admin/products", requireAdmin, (req, res) => {
 });
 
 app.put("/api/admin/config", requireAdmin, (req, res) => {
-  config.email = req.body.email || "";
+  config.email = req.body.email ?? config.email ?? "";
+  config.whatsappNumber = req.body.whatsappNumber ?? config.whatsappNumber ?? "";
+  config.whatsappMessage = req.body.whatsappMessage ?? config.whatsappMessage ?? "";
+  writeJSON(CONFIG_PATH, config);
+  res.json({ ok: true });
+});
+
+app.post("/api/admin/upload-offers", requireAdmin, (req, res) => {
+  if (!req.body || req.body.length === 0) {
+    return res.status(400).json({ error: "No se recibió ningún archivo" });
+  }
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(OFFERS_PDF_PATH, req.body);
+  config.offersUpdatedAt = new Date().toISOString();
+  writeJSON(CONFIG_PATH, config);
+  res.json({ ok: true });
+});
+
+app.post("/api/admin/delete-offers", requireAdmin, (req, res) => {
+  if (fs.existsSync(OFFERS_PDF_PATH)) fs.unlinkSync(OFFERS_PDF_PATH);
+  delete config.offersUpdatedAt;
   writeJSON(CONFIG_PATH, config);
   res.json({ ok: true });
 });
