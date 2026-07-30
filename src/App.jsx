@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import * as XLSX from "xlsx";
-import { Upload, Image as ImageIcon, Trash2, Plus, Minus, ShoppingBag, X, Mail, Package, Check, AlertCircle, Search, Lock, RotateCcw, CreditCard, ListOrdered } from "lucide-react";
+import { Upload, Image as ImageIcon, Trash2, Plus, Minus, ShoppingBag, X, Mail, Package, Check, AlertCircle, Search, Lock, RotateCcw, CreditCard, ListOrdered, Eye, EyeOff } from "lucide-react";
 
 const uid = () => Math.random().toString(36).slice(2, 10);
-const emptyProduct = () => ({ id: uid(), sku: "", stock: 0, price: 0, description: "", marca: "", rubro: "", image: null });
+const emptyProduct = () => ({ id: uid(), sku: "", stock: 0, price: 0, description: "", marca: "", rubro: "", status: "activo", image: null });
 
 function normalizeHeader(h) {
   return String(h || "").trim().toLowerCase().replace(/[áàä]/g, "a").replace(/[éèë]/g, "e").replace(/[íìï]/g, "i").replace(/[óòö]/g, "o").replace(/[úùü]/g, "u");
@@ -647,11 +647,25 @@ function Admin({ email, setEmail, adminSecret, onCatalogChanged, flash }) {
   }
 
   function confirmImport() {
-    const prevBySku = new Map(products.map((p) => [p.sku, p]));
-    const next = preview.map((p) => ({ ...p, image: p.image || prevBySku.get(p.sku)?.image || null }));
+    const importedBySku = new Map(preview.map((p) => [p.sku, p]));
+    const seenSkus = new Set();
+
+    const updatedExisting = products.map((p) => {
+      const imported = importedBySku.get(p.sku);
+      if (imported) {
+        seenSkus.add(p.sku);
+        return { ...p, ...imported, image: imported.image || p.image || null, status: "activo" };
+      }
+      return { ...p, status: "suspendido" };
+    });
+
+    const newOnes = preview.filter((p) => !seenSkus.has(p.sku)).map((p) => ({ ...p, status: "activo" }));
+
+    const next = [...updatedExisting, ...newOnes];
     setProducts(next);
     setPreview(null);
-    flash("Catálogo reemplazado con los productos del Excel.");
+    const suspendidos = next.filter((p) => p.status === "suspendido").length;
+    flash(`Catálogo actualizado. ${suspendidos} producto(s) quedaron suspendidos por no estar en este Excel.`);
   }
 
   function updateProduct(id, field, value) {
@@ -696,7 +710,7 @@ function Admin({ email, setEmail, adminSecret, onCatalogChanged, flash }) {
 
       <Section icon={<Upload size={16} />} title="Cargar catálogo desde Excel">
         <p style={{ fontSize: 12.5, color: "#9A948C", marginTop: -6, marginBottom: 12 }}>
-          Columnas reconocidas: <strong>Codigo</strong> (o SKU), <strong>Stock</strong>, <strong>Lista1</strong> (o Precio), <strong>Descripcion</strong>. El resto de las columnas de tu Excel (Rubro, Marca, Precio Compra, etc.) se ignoran. <strong>Al confirmar, reemplaza todo el catálogo actual</strong> — los productos que no estén en este Excel se borran de la tienda. Si un SKU ya existía, conserva su foto automáticamente.
+          Columnas reconocidas: <strong>Codigo</strong> (o SKU), <strong>Stock</strong>, <strong>Lista1</strong> (o Precio), <strong>Descripcion</strong>, <strong>Marca</strong>, <strong>Rubro</strong>. Al confirmar: los productos del Excel se actualizan (o se crean si son nuevos), y los que ya estaban cargados pero <strong>no</strong> aparecen en este Excel pasan a <strong>suspendidos</strong> — no se borran, solo dejan de verse en la tienda hasta que vuelvan a aparecer en un Excel futuro.
         </p>
         <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleExcel} style={{ display: "none" }} />
         <button className="btn" onClick={() => fileRef.current.click()} style={{ background: "#F2EFEA", color: "#0A0A0A", padding: "10px 18px", borderRadius: 8, fontSize: 13.5, display: "flex", alignItems: "center", gap: 8 }}>
@@ -707,7 +721,7 @@ function Admin({ email, setEmail, adminSecret, onCatalogChanged, flash }) {
       {preview && (
         <Section icon={<Check size={16} />} title={`Previsualización (${preview.length} filas)`}>
           <div style={{ display: "flex", gap: 6, alignItems: "center", color: "#C9A227", fontSize: 12.5, marginTop: -4, marginBottom: 12 }}>
-            <AlertCircle size={14} /> Al confirmar, se van a borrar los {products.length} productos actuales y quedar solo estos {preview.length}.
+            <AlertCircle size={14} /> Los productos que no estén en este Excel van a quedar suspendidos (no se borran, ni pierden su foto).
           </div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -732,7 +746,7 @@ function Admin({ email, setEmail, adminSecret, onCatalogChanged, flash }) {
             </table>
           </div>
           <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-            <button className="btn" onClick={confirmImport} style={{ background: "#F2EFEA", color: "#0A0A0A", padding: "10px 18px", borderRadius: 8, fontSize: 13.5 }}>Reemplazar catálogo</button>
+            <button className="btn" onClick={confirmImport} style={{ background: "#F2EFEA", color: "#0A0A0A", padding: "10px 18px", borderRadius: 8, fontSize: 13.5 }}>Actualizar catálogo</button>
             <button className="btn" onClick={() => setPreview(null)} style={{ background: "#1C1C1C", color: "#C9C2B6", padding: "10px 18px", borderRadius: 8, fontSize: 13.5 }}>Cancelar</button>
           </div>
         </Section>
@@ -743,19 +757,34 @@ function Admin({ email, setEmail, adminSecret, onCatalogChanged, flash }) {
           <div style={{ padding: 20, textAlign: "center", color: "#9A948C", fontSize: 13 }}>Cargando…</div>
         ) : products.length === 0 ? <EmptyState text="Sin productos todavía." /> : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <div style={{ fontSize: 11.5, color: "#9A948C", marginBottom: -2 }}>El Rubro es solo para uso interno — nunca se muestra en la tienda pública.</div>
-            {products.map((p) => (
-              <div key={p.id} style={{ display: "grid", gridTemplateColumns: "56px 100px 100px 100px 80px 100px 1fr 32px", gap: 10, alignItems: "center", background: "#141414", border: "1px solid #242424", borderRadius: 10, padding: 10 }}>
+            <div style={{ fontSize: 11.5, color: "#9A948C", marginBottom: -2 }}>El Rubro es solo para uso interno — nunca se muestra en la tienda pública. Un producto sin precio, o marcado como suspendido, no aparece en la tienda.</div>
+            {products.map((p) => {
+              const suspendido = p.status === "suspendido";
+              const sinPrecio = !(Number(p.price) > 0);
+              return (
+              <div key={p.id} style={{ display: "grid", gridTemplateColumns: "56px 100px 100px 100px 80px 100px 1fr 32px 32px", gap: 10, alignItems: "center", background: "#141414", border: `1px solid ${suspendido ? "#3A3A3A" : "#242424"}`, borderRadius: 10, padding: 10, opacity: suspendido ? 0.55 : 1 }}>
                 <ImagePicker image={p.image} onPick={(f) => updateImage(p.id, f)} small />
                 <input value={p.sku} onChange={(e) => updateProduct(p.id, "sku", e.target.value)} placeholder="SKU" style={{ padding: "7px 8px", borderRadius: 6, border: "1px solid #2A2A2A", fontSize: 12.5, fontFamily: "'IBM Plex Mono', monospace" }} />
                 <input value={p.marca || ""} onChange={(e) => updateProduct(p.id, "marca", e.target.value)} placeholder="Marca" style={{ padding: "7px 8px", borderRadius: 6, border: "1px solid #2A2A2A", fontSize: 12.5 }} />
                 <input value={p.rubro || ""} onChange={(e) => updateProduct(p.id, "rubro", e.target.value)} placeholder="Rubro (interno)" style={{ padding: "7px 8px", borderRadius: 6, border: "1px solid #2A2A2A", fontSize: 12.5, background: "#0A0A0A" }} />
                 <input type="number" value={p.stock} onChange={(e) => updateProduct(p.id, "stock", e.target.value)} placeholder="Stock" style={{ padding: "7px 8px", borderRadius: 6, border: "1px solid #2A2A2A", fontSize: 12.5 }} />
-                <input type="number" value={p.price} onChange={(e) => updateProduct(p.id, "price", e.target.value)} placeholder="Precio" style={{ padding: "7px 8px", borderRadius: 6, border: "1px solid #2A2A2A", fontSize: 12.5 }} />
-                <input value={p.description} onChange={(e) => updateProduct(p.id, "description", e.target.value)} placeholder="Descripción" style={{ padding: "7px 8px", borderRadius: 6, border: "1px solid #2A2A2A", fontSize: 12.5 }} />
-                <button className="btn" onClick={() => removeProduct(p.id)} style={{ background: "transparent", color: "#B4483C", padding: 6, display: "flex", justifyContent: "center" }}><Trash2 size={16} /></button>
+                <input type="number" value={p.price} onChange={(e) => updateProduct(p.id, "price", e.target.value)} placeholder="Precio" style={{ padding: "7px 8px", borderRadius: 6, border: `1px solid ${sinPrecio ? "#B4483C" : "#2A2A2A"}`, fontSize: 12.5 }} />
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  <input value={p.description} onChange={(e) => updateProduct(p.id, "description", e.target.value)} placeholder="Descripción" style={{ padding: "7px 8px", borderRadius: 6, border: "1px solid #2A2A2A", fontSize: 12.5 }} />
+                  {(suspendido || sinPrecio) && (
+                    <span style={{ fontSize: 10.5, color: "#B4483C" }}>
+                      {suspendido ? "Suspendido — no visible en la tienda" : "Sin precio — no visible en la tienda"}
+                    </span>
+                  )}
+                </div>
+                <button className="btn" onClick={() => updateProduct(p.id, "status", suspendido ? "activo" : "suspendido")} title={suspendido ? "Activar" : "Suspender"}
+                  style={{ background: "transparent", color: suspendido ? "#9BC17F" : "#C9C2B6", padding: 6, display: "flex", justifyContent: "center" }}>
+                  {suspendido ? <Eye size={16} /> : <EyeOff size={16} />}
+                </button>
+                <button className="btn" onClick={() => removeProduct(p.id)} title="Borrar definitivamente" style={{ background: "transparent", color: "#B4483C", padding: 6, display: "flex", justifyContent: "center" }}><Trash2 size={16} /></button>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
         <button className="btn" onClick={addBlank} style={{ marginTop: 14, background: "#1C1C1C", color: "#C9C2B6", padding: "9px 16px", borderRadius: 8, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
