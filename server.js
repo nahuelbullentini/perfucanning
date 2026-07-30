@@ -26,7 +26,7 @@ const PORT = process.env.PORT || 3000;
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, "data");
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
 const CONFIG_PATH = path.join(DATA_DIR, "config.json");
 const PRODUCTS_PATH = path.join(DATA_DIR, "products.json");
 const ORDERS_PATH = path.join(DATA_DIR, "orders.json");
@@ -74,7 +74,7 @@ function requireAdmin(req, res, next) {
 
 app.get("/api/products", (req, res) => {
   const publicProducts = products
-    .filter((p) => p.status !== "suspendido" && Number(p.price) > 0)
+    .filter((p) => p.status !== "suspendido" && Number(p.price) > 0 && Number(p.stock) > 0)
     .map(({ status, ...rest }) => rest);
   res.json(publicProducts);
 });
