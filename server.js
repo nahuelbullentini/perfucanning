@@ -15,9 +15,11 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import * as XLSX from "xlsx";
 
 const app = express();
 app.use(express.json({ limit: "20mb" })); // las fotos van como base64, pueden pesar
+app.use("/api/admin/import-excel", express.raw({ type: "*/*", limit: "20mb" }));
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_SECRET = process.env.ADMIN_SECRET;
@@ -124,7 +126,44 @@ app.post("/api/create-preference", async (req, res) => {
 
 app.get("/api/mp-status", (req, res) => res.json({ connected: !!config.mpAccessToken }));
 
-/* ---------- Admin (protegido con ADMIN_SECRET) ---------- */
+function normalizeHeader(h) {
+  return String(h || "").trim().toLowerCase()
+    .replace(/[áàä]/g, "a").replace(/[éèë]/g, "e").replace(/[íìï]/g, "i").replace(/[óòö]/g, "o").replace(/[úùü]/g, "u");
+}
+
+app.post("/api/admin/import-excel", requireAdmin, (req, res) => {
+  try {
+    const wb = XLSX.read(req.body, { type: "buffer" });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+    const prevBySku = new Map(products.map((p) => [p.sku, p]));
+
+    const parsed = rows.map((row) => {
+      const map = {};
+      Object.keys(row).forEach((k) => { map[normalizeHeader(k)] = row[k]; });
+      const sku = String(map["sku"] ?? map["codigo"] ?? map["cod"] ?? "").trim();
+      return {
+        id: prevBySku.get(sku)?.id || (Date.now().toString(36) + Math.random().toString(36).slice(2, 6)),
+        sku,
+        stock: Number(map["stock"] ?? 0) || 0,
+        price: Number(map["precio"] ?? map["lista1"] ?? map["preciolista1"] ?? 0) || 0,
+        description: String(map["descripcion"] ?? "").trim(),
+        image: prevBySku.get(sku)?.image || null,
+      };
+    }).filter((p) => p.sku);
+
+    if (parsed.length === 0) {
+      return res.status(400).json({ error: "No se encontraron filas válidas en el Excel" });
+    }
+
+    products = parsed;
+    writeJSON(PRODUCTS_PATH, products);
+    res.json({ ok: true, count: products.length });
+  } catch (err) {
+    res.status(500).json({ error: "No se pudo leer el Excel" });
+  }
+});
 
 app.post("/api/admin/verify", requireAdmin, (req, res) => res.json({ ok: true }));
 
